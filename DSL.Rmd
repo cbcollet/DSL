@@ -1,0 +1,49 @@
+---
+title: "DSL"
+author: "Chu LI"
+date: "2025-02-20"
+output: html_document
+---
+
+```{r}
+install.packages("readxl")  # Run this only once
+library(readxl)
+
+divorce_data <- read_excel("divorce.xlsx")  # adjust the filename if needed
+head(divorce_data)
+str(divorce_data)
+
+```
+```{r}
+install.packages("dplyr")  # Run this only once
+```
+```{r}
+summary(divorce_data)
+
+```
+
+```{r}
+library(dplyr)
+```
+```{r}
+str(divorce_data)
+names(divorce_data)
+```
+
+```{r}
+names(divorce_data)[length(names(divorce_data))] 
+# Get the last column's name
+```
+
+```{r}
+#To confirm that "Divorce_Y_N" is correct
+table(divorce_data$Divorce_Y_N)
+```
+
+```{r}
+#check for mising values
+sum(is.na(divorce_data))
+colSums(is.na(divorce_data))
+
+```
+
