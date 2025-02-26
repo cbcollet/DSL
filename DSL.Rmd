@@ -47,3 +47,73 @@ colSums(is.na(divorce_data))
 
 ```
 
+```{r}
+# In this section we sorted the question we thought were a topic of communication behavior together to see the average score of these questions against the divorce Y N (C.Collet)
+library(dplyr)
+
+divorce_data_groups <- divorce_data %>%
+  mutate(
+    communication_behavior = rowMeans(select(., Sorry_end, begin_correct, Contact, Aggro_argue, Always_never, 
+                                              negative_personality, offensive_expressions, insult, humiliate, not_calm, 
+                                              hate_subjects, sudden_discussion, `idk_what's_going_on`, calm_breaks, 
+                                              argue_then_leave, silent_for_calm, good_to_leave_home, 
+                                              silence_instead_of_discussion, silence_for_harm, silence_fear_anger, 
+                                              `I'm_right`, accusations, `I'm_not_guilty`, `I'm_not_wrong`, 
+                                              no_hesitancy_inadequate, `you're_inadequate`, incompetence), na.rm = TRUE)
+  )
+head(divorce_data_groups[, c("communication_behavior", "Divorce_Y_N")])
+communication_data <- divorce_data_groups%>% select(communication_behavior, Divorce_Y_N)
+```
+
+```{r}
+# Here we did the same thing, but for questions that we consider value_alignment. (C.Collet)
+
+divorce_data_va <- divorce_data %>%
+  mutate(
+    value_alignment = rowMeans(select(., enjoy_holiday, enjoy_travel, common_goals, harmony, freeom_value, 
+                                      entertain, people_goals, dreams, love, happy, marriage, roles, trust, 
+                                      likes, care_sick, fav_food, stresses, inner_world, anxieties, 
+                                      current_stress, hopes_wishes, know_well, friends_social),
+                               na.rm = TRUE)
+  )
+# New dataset with value_alignment and Divorce_Y_N
+value_alignment_data <- divorce_data_va %>% select(value_alignment, Divorce_Y_N)
+
+
+```
+
+```{r}
+
+# And again, but now for questions we consider to be relevant for Knowledge of spouse. We now have 3 groups: Communication behavior, value alignment and knowledge of spouse. (C.Collet)
+
+divorce_data_kos <- divorce_data %>%
+  mutate(
+    knowledge_of_spouse = rowMeans(select(., likes, care_sick, fav_food, stresses, inner_world, anxieties, 
+                                         current_stress, hopes_wishes, know_well, friends_social), na.rm = TRUE)
+  )
+
+# Create a separate dataset for knowledge_of_spouse and Divorce_Y_N
+knowledge_of_spouse_data <- divorce_data_kos %>% select(knowledge_of_spouse, Divorce_Y_N)
+
+
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+
+
