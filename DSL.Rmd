@@ -97,11 +97,92 @@ knowledge_of_spouse_data <- divorce_data_kos %>% select(knowledge_of_spouse, Div
 
 
 ```
+
 ```{r}
+install.packages("caret")
+install.packages("randomForest")
 ```
 ```{r}
+# I tried to get the optimal amount of variables and then select the most important ones that change the chance of prediction the most.
+library(caret)
+library(randomForest)
+control <- rfeControl(functions=rfFuncs, method="cv", number=10)  # Using Random Forest for feature ranking
+set.seed(123)  # For reproducibility
+rfe_result <- rfe(x=divorce_data[, -55], y=divorce_data$Divorce_Y_N, 
+                  sizes=c(5, 10, 15, 20),  # Different feature set sizes to test
+                  rfeControl=control)
+print(rfe_result)  # Shows selected features and performance
+plot(rfe_result)   # Visualizes accuracy vs. number of features
+selected_features <- predictors(rfe_result)
+data_selected <- divorce_data[, c(selected_features, "Divorce_Y_N")]
+
+
+predictors(rfe_result)
+optimalnumberofpredictors <- predictors(rfe_result)
+print(optimalnumberofpredictors)
+
 ```
+
 ```{r}
+# This piece of code uses a logistic regression model with the 10 variables that where the most important. The output gives us an indication on how good the model is in predicting divorce. 
+
+# Convert Divorce_Y_N to a factor (0 = No, 1 = Yes)
+divorce_data$Divorce_Y_N <- as.factor(divorce_data$Divorce_Y_N)
+
+# Check if conversion was successful
+str(divorce_data$Divorce_Y_N)
+table(divorce_data$Divorce_Y_N)  # Check distribution
+
+set.seed(123) # Ensure reproducibility
+
+# Create training and testing indices
+trainIndex <- createDataPartition(divorce_data$Divorce_Y_N, p = 0.8, list = FALSE)
+
+# Split the dataset
+trainData <- divorce_data[trainIndex, ]
+testData  <- divorce_data[-trainIndex, ]
+
+# Verify the split
+table(trainData$Divorce_Y_N)  
+table(testData$Divorce_Y_N)  
+
+# Define the formula using the 10 selected features
+formula <- Divorce_Y_N ~ `idk_what's_going_on` + marriage + anxieties + roles + harmony +
+                         happy + enjoy_travel + trust + hopes_wishes + sudden_discussion
+
+# Train logistic regression model
+logit_model <- glm(formula, data = trainData, family = binomial)
+
+# Print model summary
+summary(logit_model)
+
+# Predict probabilities on test data
+pred_probs <- predict(logit_model, newdata = testData, type = "response")
+
+# Convert probabilities to binary predictions (Yes/No)
+pred_classes <- ifelse(pred_probs > 0.5, "Yes", "No")
+
+# Convert to factors to match test data
+pred_classes <- as.factor(pred_classes)
+
+# View first few predictions
+head(pred_classes)
+
+# Check the levels of both factors
+levels(pred_classes)
+levels(testData$Divorce_Y_N)
+
+# Align levels of both predicted and actual values
+levels(pred_classes) <- c("No", "Yes")  # Adjust these as per your actual labels
+levels(testData$Divorce_Y_N) <- c("No", "Yes")  # Adjust these as per your actual labels
+
+# Now run confusion matrix again
+conf_matrix <- confusionMatrix(pred_classes, testData$Divorce_Y_N)
+
+# Print results
+print(conf_matrix)
+
+
 ```
 ```{r}
 ```
