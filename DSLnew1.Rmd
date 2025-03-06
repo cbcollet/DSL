@@ -1,0 +1,200 @@
+---
+title: "DSL"
+author: "Chu LI"
+date: "2025-02-20"
+output: html_document
+---
+
+```{r}
+install.packages("readxl")  # Run this only once
+library(readxl)
+
+divorce_data <- read_excel("divorce.xlsx")  # adjust the filename if needed
+head(divorce_data)
+str(divorce_data)
+
+```
+```{r}
+install.packages("dplyr")  # Run this only once
+```
+```{r}
+summary(divorce_data)
+
+```
+
+```{r}
+library(dplyr)
+```
+```{r}
+str(divorce_data)
+names(divorce_data)
+```
+
+```{r}
+names(divorce_data)[length(names(divorce_data))] 
+# Get the last column's name
+```
+
+```{r}
+#To confirm that "Divorce_Y_N" is correct
+table(divorce_data$Divorce_Y_N)
+```
+
+```{r}
+#check for mising values
+sum(is.na(divorce_data))
+colSums(is.na(divorce_data))
+
+```
+
+```{r}
+# In this section we sorted the question we thought were a topic of communication behavior together to see the average score of these questions against the divorce Y N (C.Collet)
+library(dplyr)
+
+divorce_data_groups <- divorce_data %>%
+  mutate(
+    communication_behavior = rowMeans(select(., Sorry_end, begin_correct, Contact, Aggro_argue, Always_never, 
+                                              negative_personality, offensive_expressions, insult, humiliate, not_calm, 
+                                              hate_subjects, sudden_discussion, `idk_what's_going_on`, calm_breaks, 
+                                              argue_then_leave, silent_for_calm, good_to_leave_home, 
+                                              silence_instead_of_discussion, silence_for_harm, silence_fear_anger, 
+                                              `I'm_right`, accusations, `I'm_not_guilty`, `I'm_not_wrong`, 
+                                              no_hesitancy_inadequate, `you're_inadequate`, incompetence), na.rm = TRUE)
+  )
+head(divorce_data_groups[, c("communication_behavior", "Divorce_Y_N")])
+communication_data <- divorce_data_groups%>% select(communication_behavior, Divorce_Y_N)
+```
+
+```{r}
+# Here we did the same thing, but for questions that we consider value_alignment. (C.Collet)
+
+divorce_data_va <- divorce_data %>%
+  mutate(
+    value_alignment = rowMeans(select(., enjoy_holiday, enjoy_travel, common_goals, harmony, freeom_value, 
+                                      entertain, people_goals, dreams, love, happy, marriage, roles, trust, 
+                                      likes, care_sick, fav_food, stresses, inner_world, anxieties, 
+                                      current_stress, hopes_wishes, know_well, friends_social),
+                               na.rm = TRUE)
+  )
+# New dataset with value_alignment and Divorce_Y_N
+value_alignment_data <- divorce_data_va %>% select(value_alignment, Divorce_Y_N)
+
+
+```
+
+```{r}
+
+# And again, but now for questions we consider to be relevant for Knowledge of spouse. We now have 3 groups: Communication behavior, value alignment and knowledge of spouse. (C.Collet)
+
+divorce_data_kos <- divorce_data %>%
+  mutate(
+    knowledge_of_spouse = rowMeans(select(., likes, care_sick, fav_food, stresses, inner_world, anxieties, 
+                                         current_stress, hopes_wishes, know_well, friends_social), na.rm = TRUE)
+  )
+
+# Create a separate dataset for knowledge_of_spouse and Divorce_Y_N
+knowledge_of_spouse_data <- divorce_data_kos %>% select(knowledge_of_spouse, Divorce_Y_N)
+
+
+```
+
+```{r}
+install.packages("caret")
+install.packages("randomForest")
+```
+```{r}
+# I tried to get the optimal amount of variables and then select the most important ones that change the chance of prediction the most.
+library(caret)
+library(randomForest)
+control <- rfeControl(functions=rfFuncs, method="cv", number=10)  # Using Random Forest for feature ranking
+set.seed(123)  # For reproducibility
+rfe_result <- rfe(x=divorce_data[, -55], y=divorce_data$Divorce_Y_N, 
+                  sizes=c(5, 10, 15, 20),  # Different feature set sizes to test
+                  rfeControl=control)
+print(rfe_result)  # Shows selected features and performance
+plot(rfe_result)   # Visualizes accuracy vs. number of features
+selected_features <- predictors(rfe_result)
+data_selected <- divorce_data[, c(selected_features, "Divorce_Y_N")]
+
+
+predictors(rfe_result)
+optimalnumberofpredictors <- predictors(rfe_result)
+print(optimalnumberofpredictors)
+
+```
+
+```{r}
+# This piece of code uses a logistic regression model with the 10 variables that where the most important. The output gives us an indication on how good the model is in predicting divorce. 
+
+# Convert Divorce_Y_N to a factor (0 = No, 1 = Yes)
+divorce_data$Divorce_Y_N <- as.factor(divorce_data$Divorce_Y_N)
+
+# Check if conversion was successful
+str(divorce_data$Divorce_Y_N)
+table(divorce_data$Divorce_Y_N)  # Check distribution
+
+set.seed(123) # Ensure reproducibility
+
+# Create training and testing indices
+trainIndex <- createDataPartition(divorce_data$Divorce_Y_N, p = 0.8, list = FALSE)
+
+# Split the dataset
+trainData <- divorce_data[trainIndex, ]
+testData  <- divorce_data[-trainIndex, ]
+
+# Verify the split
+table(trainData$Divorce_Y_N)  
+table(testData$Divorce_Y_N)  
+
+# Define the formula using the 10 selected features
+formula <- Divorce_Y_N ~ `idk_what's_going_on` + marriage + anxieties + roles + harmony +
+                         happy + enjoy_travel + trust + hopes_wishes + sudden_discussion
+
+# Train logistic regression model
+logit_model <- glm(formula, data = trainData, family = binomial)
+
+# Print model summary
+summary(logit_model)
+
+# Predict probabilities on test data
+pred_probs <- predict(logit_model, newdata = testData, type = "response")
+
+# Convert probabilities to binary predictions (Yes/No)
+pred_classes <- ifelse(pred_probs > 0.5, "Yes", "No")
+
+# Convert to factors to match test data
+pred_classes <- as.factor(pred_classes)
+
+# View first few predictions
+head(pred_classes)
+
+# Check the levels of both factors
+levels(pred_classes)
+levels(testData$Divorce_Y_N)
+
+# Align levels of both predicted and actual values
+levels(pred_classes) <- c("No", "Yes")  # Adjust these as per your actual labels
+levels(testData$Divorce_Y_N) <- c("No", "Yes")  # Adjust these as per your actual labels
+
+# Now run confusion matrix again
+conf_matrix <- confusionMatrix(pred_classes, testData$Divorce_Y_N)
+
+# Print results
+print(conf_matrix)
+
+
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+
+
