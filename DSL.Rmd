@@ -136,6 +136,8 @@ table(divorce_data$Divorce_Y_N)  # Check distribution
 set.seed(123) # Ensure reproducibility
 
 # Create training and testing indices
+install.packages("caret")
+library(caret)
 trainIndex <- createDataPartition(divorce_data$Divorce_Y_N, p = 0.8, list = FALSE)
 
 # Split the dataset
@@ -184,17 +186,177 @@ print(conf_matrix)
 
 
 ```
+
+
 ```{r}
-```
-```{r}
-```
-```{r}
-```
-```{r}
-```
-```{r}
-```
-```{r}
+#Handle illegal characters in the variable name before proceeding with the test(C.L)
+
+# Convert feature names to valid R variable names
+top_10_features_clean <- make.names(top_10_features)
+
+# Remove single quotes and other problematic characters
+top_10_features_clean <- gsub("['\"()&]", "", top_10_features_clean)  # Remove quotes, brackets, & symbol
+top_10_features_clean <- gsub("[^A-Za-z0-9_]", "_", top_10_features_clean)  # Replace other special characters with underscores
+
+# Create formula with cleaned feature names
+formula_top10 <- as.formula(paste("Divorce_Y_N ~", paste(top_10_features_clean, collapse = " + ")))
+
+# Print to check if formula is correctly formatted
+print(formula_top10)
+
 ```
 
+```{r}
+print(top_10_features_clean)
+```
+
+
+```{r}
+#First, we split the data into two parts: one part was used to train the model and the other part was used to test the model's effectiveness. Then we made three different predictions, testing the effect of using all factors, using the 10 most important factors, and grouping the factors together.(C.L)
+
+# Load necessary libraries
+library(caret)
+library(randomForest)
+library(dplyr)
+
+# Ensure the Divorce_Y_N variable is a factor (0 = No, 1 = Yes)
+# This ensures the target variable is treated as a categorical factor, crucial for classification tasks.
+divorce_data$Divorce_Y_N <- as.factor(divorce_data$Divorce_Y_N)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Split the dataset into training and testing sets (80% training, 20% testing)
+trainIndex <- createDataPartition(divorce_data$Divorce_Y_N, p = 0.8, list = FALSE)
+trainData <- divorce_data[trainIndex, ]
+testData  <- divorce_data[-trainIndex, ]
+
+# -----------------------------------------------
+# 1. Model using ALL available variables
+# -----------------------------------------------
+# Define the formula using all predictors (clean feature names)
+formula_all <- as.formula(paste("Divorce_Y_N ~", paste(names(divorce_data)[-length(names(divorce_data))], collapse = " + ")))
+
+# Train logistic regression model with all features
+logit_model_all <- glm(formula_all, data = trainData, family = binomial)
+
+# Predict probabilities on test data
+pred_probs_all <- predict(logit_model_all, newdata = testData, type = "response")
+
+# Convert probabilities to binary predictions
+pred_classes_all <- ifelse(pred_probs_all > 0.5, "Yes", "No")
+pred_classes_all <- as.factor(pred_classes_all)
+
+# Ensure both are factors and have the same levels
+pred_classes_all <- factor(pred_classes_all, levels = levels(testData$Divorce_Y_N))
+testData$Divorce_Y_N <- factor(testData$Divorce_Y_N)
+
+# Now compute confusion matrix
+conf_matrix_all <- confusionMatrix(pred_classes_all, testData$Divorce_Y_N)
+
+# Evaluate model performance
+print(conf_matrix_all)
+
+# -----------------------------------------------
+# 2. Model using ONLY the 10 most important features
+# -----------------------------------------------
+# Select the top 10 features identified earlier
+top_10_features <- c("idk_what's_going_on", "marriage", "anxieties", "roles", "harmony",
+                     "happy", "enjoy_travel", "trust", "hopes_wishes", "sudden_discussion")
+
+# Ensure feature names are valid for formula
+top_10_features_clean <- make.names(top_10_features)
+
+# Create formula with cleaned feature names
+formula_top10 <- as.formula(paste("Divorce_Y_N ~", paste(top_10_features_clean, collapse = " + ")))
+
+# Train logistic regression model with top 10 features
+logit_model_top10 <- glm(formula_top10, data = trainData, family = binomial)
+
+# Predict probabilities on test data
+pred_probs_top10 <- predict(logit_model_top10, newdata = testData, type = "response")
+
+# Convert probabilities to binary predictions
+pred_classes_top10 <- ifelse(pred_probs_top10 > 0.5, "Yes", "No")
+pred_classes_top10 <- as.factor(pred_classes_top10)
+
+# Ensure both prediction and actual values have the same levels
+pred_classes_top10 <- factor(pred_classes_top10, levels = levels(testData$Divorce_Y_N))
+
+# Now compute confusion matrix
+conf_matrix_top10 <- confusionMatrix(pred_classes_top10, testData$Divorce_Y_N)
+
+# Evaluate model performance
+conf_matrix_top10 <- confusionMatrix(pred_classes_top10, testData$Divorce_Y_N)
+
+# Print results
+print(conf_matrix_top10)
+
+# -----------------------------------------------
+# 3. Categorizing variables into different groups
+# -----------------------------------------------
+# Define grouped feature sets
+group_communication <- c("Sorry_end", "begin_correct", "Contact", "Aggro_argue", "Always_never",
+                         "negative_personality", "offensive_expressions", "insult", "humiliate", "not_calm",
+                         "hate_subjects", "sudden_discussion", "idk_what's_going_on", "calm_breaks",
+                         "argue_then_leave", "silent_for_calm", "good_to_leave_home",
+                         "silence_instead_of_discussion", "silence_for_harm", "silence_fear_anger",
+                         "I'm_right", "accusations", "I'm_not_guilty", "I'm_not_wrong",
+                         "no_hesitancy_inadequate", "you're_inadequate", "incompetence")
+
+group_value_alignment <- c("enjoy_holiday", "enjoy_travel", "common_goals", "harmony", "freeom_value",
+                           "entertain", "people_goals", "dreams", "love", "happy", "marriage", "roles", "trust",
+                           "likes", "care_sick", "fav_food", "stresses", "inner_world", "anxieties",
+                           "current_stress", "hopes_wishes", "know_well", "friends_social")
+
+group_knowledge_spouse <- c("likes", "care_sick", "fav_food", "stresses", "inner_world", "anxieties",
+                            "current_stress", "hopes_wishes", "know_well", "friends_social")
+
+# Ensure feature names are valid for formula in grouped features
+group_communication <- make.names(group_communication)
+group_value_alignment <- make.names(group_value_alignment)
+group_knowledge_spouse <- make.names(group_knowledge_spouse)
+
+# Create logistic regression models for each group
+
+# Function to train model and print results
+train_and_evaluate <- function(feature_set, group_name) {
+  formula_group <- as.formula(paste("Divorce_Y_N ~", paste(feature_set, collapse = " + ")))
+  
+  model <- glm(formula_group, data = trainData, family = binomial)
+  
+  pred_probs <- predict(model, newdata = testData, type = "response")
+  pred_classes <- ifelse(pred_probs > 0.5, "Yes", "No")
+  pred_classes <- as.factor(pred_classes)
+  
+  conf_matrix <- confusionMatrix(pred_classes, testData$Divorce_Y_N)
+  
+  print(paste("Results for", group_name, "group:"))
+  print(conf_matrix)
+}
+
+# Train and evaluate function with adjusted factor levels
+train_and_evaluate <- function(feature_set, group_name) {
+  formula_group <- as.formula(paste("Divorce_Y_N ~", paste(feature_set, collapse = " + ")))
+  
+  model <- glm(formula_group, data = trainData, family = binomial)
+  
+  pred_probs <- predict(model, newdata = testData, type = "response")
+  pred_classes <- ifelse(pred_probs > 0.5, "Yes", "No")
+  
+  # Ensure both prediction and actual values have the same levels
+  pred_classes <- factor(pred_classes, levels = levels(testData$Divorce_Y_N))
+  
+  # Compute confusion matrix
+  conf_matrix <- confusionMatrix(pred_classes, testData$Divorce_Y_N)
+  
+  print(paste("Results for", group_name, "group:"))
+  print(conf_matrix)
+}
+
+
+```
+```{r}
+# We may be experiencing data imbalance problems, variable selection and characterization problems, extreme predictions of the model......
+```
 
