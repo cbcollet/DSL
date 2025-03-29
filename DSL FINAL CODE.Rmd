@@ -1,0 +1,103 @@
+---
+title: "DSL FINAL CODE"
+author: "Casper Collet and Chu Li"
+date: "2025-03-29"
+output: html_document
+---
+
+```{r}
+#Written by: Casper Collet
+install.packages("readxl")  # Run this only once
+library(readxl)
+
+divorce_data <- read_excel("divorce.xlsx")
+head(divorce_data)
+str(divorce_data)
+```
+
+```{r}
+#Written by: Casper Collet
+
+#A couple of variables had backticks in them and needed to be changed to ensure we can work with the dataset.
+
+colnames(divorce_data)[colnames(divorce_data) == "2_strangers"] <- "Two_Strangers"
+colnames(divorce_data)[colnames(divorce_data) == "idk_what's_going_on"] <- "idk_what_is_going_on"
+colnames(divorce_data)[colnames(divorce_data) == "I'm_right"] <- "I_Am_Right"
+colnames(divorce_data)[colnames(divorce_data) ==  "I'm_not_wrong"] <- "I_am_not_wrong"
+colnames(divorce_data)[colnames(divorce_data) ==  "I'm_not_guilty"] <- "I_am_not_guilty"
+colnames(divorce_data)[colnames(divorce_data) ==  "you're_inadequate"] <- "you_are_inadequate"
+
+#Our first task is: Split around 20% of the dataset of so we can keep some unseen data to test our models on after we tried them on the 80%. To keep it random, we will remove the last.
+
+Unseendata <- divorce_data[136:170, ]
+seendata <- divorce_data[1:135, ]
+```
+
+```{r}
+#Written by: Casper Collet
+#Now that we have data to work with (the remaining 80%) we can try different models to test predictability power. We start with random forest. We choos deliberatly to not split the seendata again in traindata and testdata because we have a relatively small dataset. Otherwise the machine learning might be less accurate and we don't want that.
+
+install.packages("randomForest")
+library(randomForest)
+
+#To ensure the last variables not interfering with the tests, we make it a binary valuable with either 1 or 0 and remove the old variable. This is just to be sure.
+
+seendata$Divorced <- as.factor(seendata$Divorce_Y_N)
+seendata <- subset(seendata, select = -Divorce_Y_N)
+
+
+rf_model <- randomForest(Divorced ~ ., data = seendata, ntree = 500, mtry = 3, importance = TRUE)
+print(rf_model)
+```
+
+```{r}
+#Written by: Casper Collet
+#We can use this random forest also to check for the most important questions for predicting divorce, after we use the different methods we can see if they also validate these.
+importance(rf_model) 
+varImpPlot(rf_model) 
+Randomforest_most_important_questions <- importance(rf_model) #To compare later on
+
+```
+
+```{r}
+#Written by: Casper Collet
+#Secondly, we will try the method Bagging (Bootstrap Aggregating). This is quite similar to RandomForest, but might give us some new insights. 
+
+bagging_model <- randomForest(Divorced ~ ., data = seendata, ntree = 500, mtry = ncol(seendata) - 1, importance = TRUE)
+
+print(bagging_model)
+
+#We immediately see that in the bagging method, has one less falsely classified object in the confusion matrix (4 became 3).
+
+importance(bagging_model)
+varImpPlot(bagging_model)
+Bagging_most_important_questions <- importance(bagging_model)
+```
+
+```{r}
+#Next up is the Lasso model (Least Absolute Shrinkage and Selection Operator). We have no categorical objects and already made sure before that the Divorce column is binary.
+
+```
+
+```{r}
+#Last but not least, the Ridge model.
+
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
