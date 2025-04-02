@@ -47,6 +47,20 @@ seendata <- subset(seendata, select = -Divorce_Y_N)
 rf_model <- randomForest(Divorced ~ ., data = seendata, ntree = 500, mtry = 3, importance = TRUE)
 print(rf_model)
 ```
+```{r}
+#Written by Casper Collet
+#Here we test the accuracy of the model on the unseendata, this came down to 100%, because it had perfect accuracy.
+library(caret)
+Unseendata$Divorced <- factor(Unseendata$Divorced, levels = levels(seendata$Divorced))
+
+unseen_predictions <- predict(rf_model, Unseendata)
+
+# Evaluate the accuracy on Unseendata
+conf_matrix_unseen <- confusionMatrix(unseen_predictions, Unseendata$Divorced)
+print(conf_matrix_unseen)
+
+
+```
 
 ```{r}
 #Written by: Casper Collet
@@ -65,7 +79,15 @@ bagging_model <- randomForest(Divorced ~ ., data = seendata, ntree = 500, mtry =
 
 print(bagging_model)
 
-#We immediately see that in the bagging method, has one less falsely classified object in the confusion matrix (4 became 3).
+#We immediately see that in the bagging method, has one less falsely classified object in the confusion matrix (4 became 3). Next on we test the bagging method on the unseen data. This show us an accuracy of 77.14% which is less than the 100% from random forest.
+
+unseen_predictions <- predict(bagging_model, Unseendata)
+
+# Evaluate the accuracy on Unseendata
+conf_matrix_unseenbag <- confusionMatrix(unseen_predictions, Unseendata$Divorced)
+print(conf_matrix_unseenbag)
+
+#Here we show the most important variables from the bagging model.
 
 importance(bagging_model)
 varImpPlot(bagging_model)
@@ -137,11 +159,11 @@ ridge_pred <- predict(ridge_model, newx = x_test, s = "lambda.min", type = "resp
 ridge_class <- ifelse(ridge_pred > 0.5, 1, 0)  # Convert probabilities to binary labels
 
 # Compute evaluation metrics
-evaluate_model <- function(true_labels, predicted_labels, predicted_probs) 
+evaluate_model <- function(true_labels, predicted_labels, predicted_probs) {
   accuracy <- sum(true_labels == predicted_labels) / length(true_labels)  # Compute accuracy
   auc <- auc(roc(true_labels, predicted_probs))  # Compute AUC-ROC
   mse <- mean((true_labels - predicted_probs)^2)  # Compute Mean Squared Error
-  return(list(accuracy = accuracy, AUC = auc, MSE = mse))
+  return(list(accuracy = accuracy, AUC = auc, MSE = mse))}
   
   # Evaluate Lasso
 lasso_results <- evaluate_model(y_test, lasso_class, lasso_pred)
