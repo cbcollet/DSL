@@ -3,54 +3,187 @@ title: "DSL FINAL CODE"
 author: "Casper Collet and Chu Li"
 date: "2025-03-29"
 output:
-  pdf_document:
-    latex_engine: xelatex
-  html_document: default
+  prettydoc::html_pretty:
+    theme: tactile
+    highlight: github
 ---
 
 ```{r}
-#Written by: Casper Collet
+#Written by: Casper Collet & Chu Li
+library(tidyverse)
 library(readxl)
-divorce_data <- as.data.frame(read_excel("divorce.xlsx"))
+
+# Load dataset
+data_file <- "divorce.xlsx"
+if (!file.exists(data_file)) {
+  stop("Error: Data file 'divorce.xlsx' not found.")
+}
+divorce_data <- read_xlsx("divorce.xlsx")
+
+# Check total rows
+cat("Total rows in divorce_data:", nrow(divorce_data), "\n")
+
+# Check for missing values
+if (any(is.na(divorce_data))) {
+  warning("Missing values detected. Removing rows with NAs.")
+  divorce_data <- divorce_data %>%
+    drop_na()
+  cat("Rows after removing NAs:", nrow(divorce_data), "\n")
+} else {
+  cat("No missing values detected.\n")
+}
+
+# Check for duplicates
+duplicates <- divorce_data %>%
+  duplicated() %>%
+  sum()
+cat("Number of duplicate rows:", duplicates, "\n")
+
+# Add row index for splitting
+divorce_data <- divorce_data %>%
+  mutate(.row = row_number())
+
+# Split into 80% training and 20% testing sets
+set.seed(123)
+Unseendata <- divorce_data %>%
+  slice_sample(prop = 0.2)  # 34 rows
+seendata <- divorce_data %>%
+  slice(-Unseendata$.row)   # Remaining 136 rows
+
+# Remove temporary row index
+Unseendata <- Unseendata %>% select(-.row)
+seendata <- seendata %>% select(-.row)
+
+# Rename columns
+divorce_data <- divorce_data %>%
+  rename(
+    Two_Strangers = `2_strangers`,
+    idk_what_is_going_on = `idk_what's_going_on`,
+    I_Am_Right = `I'm_right`,
+    I_am_not_wrong = `I'm_not_wrong`,
+    I_am_not_guilty = `I'm_not_guilty`,
+    you_are_inadequate = `you're_inadequate`
+  )
+Unseendata <- Unseendata %>%
+  rename(
+    Two_Strangers = `2_strangers`,
+    idk_what_is_going_on = `idk_what's_going_on`,
+    I_Am_Right = `I'm_right`,
+    I_am_not_wrong = `I'm_not_wrong`,
+    I_am_not_guilty = `I'm_not_guilty`,
+    you_are_inadequate = `you're_inadequate`
+  )
+seendata <- seendata %>%
+  rename(
+    Two_Strangers = `2_strangers`,
+    idk_what_is_going_on = `idk_what's_going_on`,
+    I_Am_Right = `I'm_right`,
+    I_am_not_wrong = `I'm_not_wrong`,
+    I_am_not_guilty = `I'm_not_guilty`,
+    you_are_inadequate = `you're_inadequate`
+  )
+
+# Convert Divorce_Y_N to factor
+seendata <- seendata %>%
+  mutate(Divorce_Y_N = as_factor(Divorce_Y_N))
+Unseendata <- Unseendata %>%
+  mutate(Divorce_Y_N = as_factor(Divorce_Y_N))
+
+# Verify row counts
+cat("Rows in seendata:", nrow(seendata), "\n")      # Should be 136
+cat("Rows in Unseendata:", nrow(Unseendata), "\n")  # Should be 34
+cat("Total rows:", nrow(seendata) + nrow(Unseendata), "\n")  # Should be 170
+ 
 head(divorce_data)
 str(divorce_data)
-
-#Written by: Casper Collet
-
-#A couple of variables had backticks in them and needed to be changed to ensure we can work with the dataset.
-
-colnames(divorce_data)[colnames(divorce_data) == "2_strangers"] <- "Two_Strangers"
-colnames(divorce_data)[colnames(divorce_data) == "idk_what's_going_on"] <- "idk_what_is_going_on"
-colnames(divorce_data)[colnames(divorce_data) == "I'm_right"] <- "I_Am_Right"
-colnames(divorce_data)[colnames(divorce_data) ==  "I'm_not_wrong"] <- "I_am_not_wrong"
-colnames(divorce_data)[colnames(divorce_data) ==  "I'm_not_guilty"] <- "I_am_not_guilty"
-colnames(divorce_data)[colnames(divorce_data) ==  "you're_inadequate"] <- "you_are_inadequate"
-
-#Our first task is: Split around 20% of the dataset of so we can keep some unseen data to test our models on after we tried them on the 80%. To keep it random, we will remove the last.
-
-set.seed(123) 
-sample_index <- sample(1:nrow(divorce_data), size = round(0.2 * nrow(divorce_data)))
-
-Unseendata <- divorce_data[sample_index, ]
-seendata <- divorce_data[-sample_index, ]
-
-# (C.L) Set mutually exclusive row names
-rownames(Unseendata) <- paste0("unseen_", 1:nrow(Unseendata))
-rownames(seendata) <- paste0("seen_", 1:nrow(seendata))
-
-# Verify no overlap
-print(head(rownames(seendata)))
-print(head(rownames(Unseendata)))
-print(intersect(rownames(seendata), rownames(Unseendata)))
-
 table(Unseendata$Divorce_Y_N, useNA = "always") 
-
 
 ```
 
 ```{r}
-#Written by: Casper Collet
-#Now that we have data to work with (the remaining 80%) we can try different models to test predictability power. We start with random forest. We choos deliberatly to not split the seendata again in traindata and testdata because we have a relatively small dataset. Otherwise the machine learning might be less accurate and we don't want that.
+# Written by: Chu Li
+# Summarize means/SDs
+overall_summary <- divorce_data %>%
+  select(1:54) %>%
+  summarise(across(.cols = everything(),
+                   .fns = list(mean = ~mean(., na.rm = TRUE),
+                               sd = ~sd(., na.rm = TRUE))))
+
+# Replace underscores in column names to avoid splitting issues
+names(overall_summary) <- gsub("_mean", ".mean", names(overall_summary))
+names(overall_summary) <- gsub("_sd", ".sd", names(overall_summary))
+
+# Pivot with dot separator
+overall_summary <- overall_summary %>%
+  pivot_longer(everything(), names_to = c("Variable", ".value"), names_sep = "\\.") %>%
+  summarise(mean_range = paste(round(range(mean, na.rm = TRUE), 3), collapse = "–"),
+            sd_range = paste(round(range(sd, na.rm = TRUE), 3), collapse = "–"))
+print(overall_summary)
+```
+
+```{r}
+# Written by: Chu Li
+# Outcome summary
+outcome_summary <- table(divorce_data$Divorce_Y_N)
+prop.table(outcome_summary)
+
+# Correlation with outcome
+cor_matrix <- cor(divorce_data[, 1:54], as.numeric(divorce_data$Divorce_Y_N))
+# Sort to find top correlations
+sorted_cor <- sort(cor_matrix[,1], decreasing = TRUE)
+print(head(sorted_cor, 5))  # Top 5: idk_what_is_going_on, happy, roles, marriage, trust
+
+# Predictor summaries (mean, SD) for top 5 questions
+top_questions <- names(head(sorted_cor, 5))
+divorce_data %>%
+  summarise(across(all_of(top_questions), list(mean = ~mean(., na.rm = TRUE), sd = ~sd(., na.rm = TRUE))))
+
+# Group differences for top 5 questions
+group_means <- divorce_data %>%
+  group_by(Divorce_Y_N) %>%
+  summarise(across(all_of(top_questions), mean, na.rm = TRUE))
+print(group_means)
+
+# Correlation among predictors (check multicollinearity)
+cor_predictors <- cor(divorce_data[, top_questions])
+print(cor_predictors)
+```
+
+```{r}
+# Written by: Chu Li
+# Load ggplot2 for visualization
+library(ggplot2)
+
+# Data for top 3
+top_vars <- c("idk_what_is_going_on", "happy", "trust")
+plot_data <- divorce_data %>%
+  select(Divorce_Y_N, all_of(top_vars)) %>%
+  mutate(Divorce_Y_N = factor(Divorce_Y_N, levels = c(0, 1), labels = c("Not Divorced", "Divorced"))) %>%
+  pivot_longer(cols = all_of(top_vars), names_to = "Variable", values_to = "Score")
+
+# Boxplot
+ggplot(plot_data, aes(x = Divorce_Y_N, y = Score)) +
+  geom_boxplot() +
+  facet_wrap(~ Variable) +
+  labs(x = "Divorce Status", y = "Score")
+
+# Data for lowest 5
+low_vars <- c("No_home_time", "silence_for_harm", "Two_Strangers", "silent_for_calm", "silence_instead_of_discussion")
+plot_data <- divorce_data %>%
+  select(Divorce_Y_N, all_of(low_vars)) %>%
+  mutate(Divorce_Y_N = factor(Divorce_Y_N, levels = c(0, 1), labels = c("Not Divorced", "Divorced"))) %>%
+  pivot_longer(cols = all_of(low_vars), names_to = "Variable", values_to = "Score")
+
+# Boxplot
+ggplot(plot_data, aes(x = Divorce_Y_N, y = Score)) +
+  geom_boxplot() +
+  facet_wrap(~ Variable) +
+  labs(x = "Divorce Status", y = "Score")
+```
+
+```{r}
+# Written by: Casper Collet
+# Now that we have data to work with (the remaining 80%) we can try different models to test predictability power. We start with random forest. We choos deliberatly to not split the seendata again in traindata and testdata because we have a relatively small dataset. Otherwise the machine learning might be less accurate and we don't want that.
 
 library(randomForest)
 
@@ -63,8 +196,8 @@ print(rf_model)
 ```
 
 ```{r}
-#Written by Casper Collet
-#Here we test the accuracy of the model on the unseendata, this came down to 100%, because it had perfect accuracy.
+# Written by Casper Collet
+# Here we test the accuracy of the model on the unseendata, this came down to 100%, because it had perfect accuracy.
 library(caret)
 Unseendata$Divorce_Y_N <- factor(Unseendata$Divorce_Y_N, levels = levels(seendata$Divorce_Y_N))
 
@@ -74,12 +207,11 @@ unseen_predictions <- predict(rf_model, Unseendata)
 conf_matrix_unseen <- confusionMatrix(unseen_predictions, Unseendata$Divorce_Y_N)
 print(conf_matrix_unseen)
 
-
 ```
 
 ```{r}
-#Written by: Casper Collet
-#We can use this random forest also to check for the most important questions for predicting divorce, after we use the different methods we can see if they also validate these.
+# Written by: Casper Collet
+# We can use this random forest also to check for the most important questions for predicting divorce, after we use the different methods we can see if they also validate these.
 importance(rf_model) 
 varImpPlot(rf_model) 
 Randomforest_most_important_questions <- importance(rf_model) #To compare later on
@@ -87,14 +219,14 @@ Randomforest_most_important_questions <- importance(rf_model) #To compare later 
 ```
 
 ```{r}
-#Written by: Casper Collet
-#Secondly, we will try the method Bagging (Bootstrap Aggregating). This is quite similar to RandomForest, but might give us some new insights. 
+# Written by: Casper Collet
+# Secondly, we will try the method Bagging (Bootstrap Aggregating). This is quite similar to RandomForest, but might give us some new insights. 
 
 bagging_model <- randomForest(Divorce_Y_N ~ ., data = seendata, ntree = 500, mtry = ncol(seendata) - 1, importance = TRUE)
 
 print(bagging_model)
 
-#We immediately see that in the bagging method, has one less falsely classified object in the confusion matrix (4 became 3). Next on we test the bagging method on the unseen data. This show us an accuracy of 77.14% which is less than the 100% from random forest.
+# We immediately see that in the bagging method, has one less falsely classified object in the confusion matrix (4 became 3). Next on we test the bagging method on the unseen data. This show us an accuracy of 77.14% which is less than the 100% from random forest.
 
 unseen_predictions <- predict(bagging_model, Unseendata)
 
@@ -102,7 +234,7 @@ unseen_predictions <- predict(bagging_model, Unseendata)
 conf_matrix_unseenbag <- confusionMatrix(unseen_predictions, Unseendata$Divorce_Y_N)
 print(conf_matrix_unseenbag)
 
-#Here we show the most important variables from the bagging model.
+# Here we show the most important variables from the bagging model.
 
 importance(bagging_model)
 varImpPlot(bagging_model)
@@ -110,7 +242,8 @@ Bagging_most_important_questions <- importance(bagging_model)
 ```
 
 ```{r}
-#Next up is the Lasso model (Least Absolute Shrinkage and Selection Operator). We have no categorical objects and already made sure before that the Divorce column is binary.(C.L)
+# written by: Chu Li
+#Next up is the Lasso model (Least Absolute Shrinkage and Selection Operator). We have no categorical objects and already made sure before that the Divorce column is binary.
 
 # Load required packages
 library(glmnet)
@@ -130,25 +263,51 @@ print(lasso_coefficients)
 ```
 
 ```{r}
-#Last but not least, the Ridge model.(C.L)
-library(glmnet)
+# written by: Chu Li
+# Last but not least, the Ridge model.
+library(dplyr)
 ridge_model <- cv.glmnet(x, y, alpha = 0, family = "binomial")  # L2 regularization
 ridge_best_lambda <- ridge_model$lambda.min  # Get the best lambda
 ridge_coefficients <- coef(ridge_model, s = ridge_best_lambda)  # Extract coefficients
 
 print("Ridge Model Coefficients:")
 print(ridge_coefficients)
+# Convert sparse matrix to a regular named vector and remove intercept
+coef_vector <- as.vector(ridge_coefficients)[-1]  # Drop intercept (first element)
+names_vector <- rownames(ridge_coefficients)[-1]  # Drop intercept name
+
+# Combine names and values into a data frame
+coef_df <- data.frame(
+  Variable = names_vector,
+  Coefficient = coef_vector
+)
+
+# Get top 10 largest coefficients by absolute value
+top10 <- coef_df %>% 
+  arrange(desc(abs(Coefficient))) %>%
+  slice(1:10)
+
+# Get bottom 10 smallest (non-zero) coefficients by absolute value
+bottom5 <- coef_df %>%
+  filter(Coefficient != 0) %>%
+  arrange(abs(Coefficient)) %>%
+  slice(1:10)
+
+# Print results
+cat("Top 10 largest coefficients (by absolute value):\n")
+print(top10)
+
+cat("\nTop 10 smallest non-zero coefficients (by absolute value):\n")
+print(bottom5)
+
 ```
 
-
 ```{r}
+# written by: Chu Li
 # Evaluate 2 models (Lasso, Ridge) using Unseendata. Then calculate Accuracy, AUC-ROC curves, and Mean Square Error (MSE) for each model. Finally Visualize AUC-ROC curves to compare model performance 
-# (C.L)
 
 # Load necessary libraries
-library(glmnet)
 library(pROC)
-library(caret)
 
 # Convert Divorce label to factor for classification
 Unseendata$Divorce_Y_N <- as.factor(Unseendata$Divorce_Y_N)
@@ -197,14 +356,8 @@ legend("bottomright", legend = c("Lasso", "Ridge"), col = c("blue", "red"), lty 
 ```
 
 ```{r}
-# (C.L)
-# Load necessary libraries
-library(randomForest)
-library(pROC)
-library(caret)
+# written by: Chu Li
 
-# Convert Divorce label to factor for classification
-colnames(Unseendata)[colnames(Unseendata) == "Divorced"] <- "Divorce_Y_N"
 Unseendata$Divorce_Y_N <- as.factor(Unseendata$Divorce_Y_N)
 
 # Train Random Forest Model
@@ -244,47 +397,4 @@ plot(roc_bagging, col = "red", add = TRUE)
 legend("bottomright", legend = c("Random Forest", "Bagging"), col = c("blue", "red"), lty = 1)
 
 ```
-## From now on are all the code to Check why all 4 of our predictions are overfit (accuracy=1, AUC=1)
-
-
-```{r}
-table(Unseendata$Divorce_Y_N)
-```
-
-```{r}
-cor_matrix <- cor(divorce_data[, 1:54], as.numeric(divorce_data$Divorce_Y_N))
-print(cor_matrix)
-```
-## The result shows that the correlation between the predictors and the response variable is very high. This might be the reason why the models are overfitting.
-
-
-
-```{r}
-intersect(rownames(seendata), rownames(Unseendata))
-```
-
-```{r}
-nrow(seendata)  # should be 136
-nrow(Unseendata)  # should be 34
-nrow(seendata) + nrow(Unseendata)  # should be 170
-```
-## The results show that the number of rows in the training and testing datasets are correct.
-
-
-
-```{r}
-# Verify no overlap
-if (length(intersect(rownames(seendata), rownames(Unseendata))) == 0) {
-  print("Split successfully, no overlap")
-} else {
-  print("Segmentation failed, overlap exists")
-}
-```
-## The results show that the split was failed, and there is an overlap between the training and testing datasets.
-
-
-
-
-
-
 
